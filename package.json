@@ -1,0 +1,11 @@
+{
+  "name": "immverse-ai-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix smart-task-manager run dev",
+    "build": "npm --prefix smart-task-manager run build",
+    "start": "npm --prefix smart-task-manager run start",
+    "install:all": "npm --prefix smart-task-manager install"
+  }
+}
