@@ -91,7 +91,7 @@ export function UserSwitcher({
         >
           {currentUser?.initials || 'U'}
         </div>
-        <span className="truncate max-w-[120px] font-normal text-gray-800">
+        <span className="truncate max-w-[80px] sm:max-w-[120px] font-normal text-gray-800">
           {currentUser ? currentUser.name : 'Select user'}
         </span>
         <ChevronDown className="w-3 h-3 text-gray-400" strokeWidth={1.5} />
@@ -99,7 +99,7 @@ export function UserSwitcher({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-60 bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-30 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-1.5 w-60 max-w-[calc(100vw-2rem)] bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-30 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
           <div className="px-3 py-2">
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
               Current Session

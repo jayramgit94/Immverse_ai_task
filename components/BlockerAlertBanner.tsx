@@ -35,7 +35,7 @@ export function BlockerAlertBanner({
                 <span className="font-mono text-[11px] text-rose-600 font-medium">
                   {blocker.id}
                 </span>
-                <span className="truncate max-w-[200px] text-gray-700 font-normal">
+                <span className="truncate max-w-[140px] sm:max-w-[200px] text-gray-700 font-normal">
                   {blocker.title}
                 </span>
                 <span className="text-[10px] text-gray-400">

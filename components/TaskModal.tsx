@@ -168,9 +168,9 @@ export function TaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-[2px] animate-in fade-in duration-100">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-100">
       <div
-        className="w-full max-w-lg bg-white border border-[#E5E7EB] rounded-lg shadow-xl flex flex-col max-h-[90vh] overflow-hidden"
+        className="w-full sm:max-w-lg bg-white border-t sm:border border-[#E5E7EB] rounded-t-2xl sm:rounded-lg shadow-xl flex flex-col max-h-[88vh] sm:max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* MODAL HEADER */}

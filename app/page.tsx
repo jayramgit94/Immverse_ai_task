@@ -321,24 +321,194 @@ export default function SmartTaskManager() {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans antialiased">
-      {/* REFINED TOP BAR (SINGLE COMBINED ROW) */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-[#E5E7EB]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3 flex-wrap">
-          {/* LEFT: Workspace title & Live Tabs (All, My Tasks, Blocked) */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-              <span className="text-gray-400">workspace</span>
-              <span className="text-gray-300">/</span>
-              <span className="text-gray-900 font-semibold text-sm">Tasks</span>
+      {/* HEADER: RESPONSIVE APP BAR */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#E5E7EB] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6">
+          {/* DESKTOP HEADER (>= 768px): SINGLE SLEEK ROW */}
+          <div className="hidden md:flex h-14 items-center justify-between gap-4">
+            {/* LEFT: Workspace title & Live Tabs */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                <span className="text-gray-400">workspace</span>
+                <span className="text-gray-300">/</span>
+                <span className="text-gray-900 font-semibold text-sm">Tasks</span>
+              </div>
+
+              {/* View Switcher Tabs with Live Counts */}
+              <div className="flex items-center p-0.5 bg-gray-100 rounded-md border border-[#E5E7EB]">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    activeTab === 'all'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  All ({tasks.length})
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('my-tasks')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    activeTab === 'my-tasks'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  My Tasks ({myTasksCount})
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('blocked')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                    activeTab === 'blocked'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  <span>Blocked ({blockedCount})</span>
+                  {blockedCount > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* View Switcher Tabs with Live Counts */}
-            <div className="flex items-center p-0.5 bg-gray-100 rounded-md border border-[#E5E7EB]">
+            {/* RIGHT: Search + Priority Filter + User Switcher + Sync + "+ New Task" */}
+            <div className="flex items-center gap-2">
+              {/* Search Input */}
+              <div className="relative w-44 lg:w-52">
+                <Search
+                  className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  strokeWidth={1.5}
+                />
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-3 h-3" strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
+
+              {/* Priority Filter */}
+              <div className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-600">
+                <Filter className="w-3 h-3 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="bg-transparent text-xs text-gray-800 focus:outline-none cursor-pointer"
+                >
+                  <option value="All">Priority: All</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+
+              {/* User Switcher */}
+              <UserSwitcher
+                currentUser={currentUser}
+                users={users}
+                onSelectUser={handleSelectUser}
+                onUserCreated={(newUser) => {
+                  setUsers((prev) => [...prev, newUser]);
+                  showToast(`Added ${newUser.name}`);
+                }}
+              />
+
+              {/* Sync Button */}
+              <button
+                onClick={() => {
+                  setIsLoading(true);
+                  loadTasks();
+                }}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                title="Sync tasks"
+              >
+                <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+
+              {/* + New Task Primary Action */}
+              <button
+                onClick={() => {
+                  setEditingTask(null);
+                  setIsModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-black rounded-md transition-colors shadow-sm flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span>New Task</span>
+              </button>
+            </div>
+          </div>
+
+          {/* MOBILE HEADER (< 768px): DEDICATED STRUCTURED MULTI-TIER LAYOUT (NO OVERFLOW/CLIPPING) */}
+          <div className="md:hidden py-2.5 space-y-2.5">
+            {/* ROW 1: Branding + Session User + Sync + New Task */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium min-w-0">
+                <span className="text-gray-400">workspace</span>
+                <span className="text-gray-300">/</span>
+                <span className="text-gray-900 font-bold text-sm tracking-tight">Tasks</span>
+                <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-mono bg-gray-100 text-gray-600 rounded-full border border-gray-200">
+                  {filteredTasks.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Sync Button */}
+                <button
+                  onClick={() => {
+                    setIsLoading(true);
+                    loadTasks();
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 active:bg-gray-100 rounded transition-colors"
+                  title="Sync tasks"
+                >
+                  <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+                </button>
+
+                {/* User Switcher */}
+                <UserSwitcher
+                  currentUser={currentUser}
+                  users={users}
+                  onSelectUser={handleSelectUser}
+                  onUserCreated={(newUser) => {
+                    setUsers((prev) => [...prev, newUser]);
+                    showToast(`Added ${newUser.name}`);
+                  }}
+                />
+
+                {/* + New Button */}
+                <button
+                  onClick={() => {
+                    setEditingTask(null);
+                    setIsModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-gray-900 hover:bg-black active:scale-95 rounded-md transition-all shadow-sm flex-shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+                  <span>New</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ROW 2: Mobile View Switcher Segmented Control */}
+            <div className="grid grid-cols-3 p-0.5 bg-gray-100 rounded-lg border border-[#E5E7EB]">
               <button
                 onClick={() => setActiveTab('all')}
-                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   activeTab === 'all'
-                    ? 'bg-white text-gray-900 shadow-sm'
+                    ? 'bg-white text-gray-900 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -347,9 +517,9 @@ export default function SmartTaskManager() {
 
               <button
                 onClick={() => setActiveTab('my-tasks')}
-                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   activeTab === 'my-tasks'
-                    ? 'bg-white text-gray-900 shadow-sm'
+                    ? 'bg-white text-gray-900 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -358,100 +528,63 @@ export default function SmartTaskManager() {
 
               <button
                 onClick={() => setActiveTab('blocked')}
-                className={`px-2.5 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                className={`py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1 ${
                   activeTab === 'blocked'
-                    ? 'bg-white text-gray-900 shadow-sm'
+                    ? 'bg-white text-gray-900 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 <span>Blocked ({blockedCount})</span>
                 {blockedCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
                 )}
               </button>
             </div>
-          </div>
 
-          {/* RIGHT: Search + Priority Filter + User Switcher + "+ New Task" */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Search Input */}
-            <div className="relative w-40 sm:w-48">
-              <Search
-                className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                strokeWidth={1.5}
-              />
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-7 py-1 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            {/* ROW 3: Full-width Search Input & Priority Filter */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search
+                  className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                  strokeWidth={1.5}
+                />
+                <input
+                  type="text"
+                  placeholder="Search tasks or assignees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-sm"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-600 flex-shrink-0 shadow-sm">
+                <Filter className="w-3 h-3 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="bg-transparent text-xs text-gray-800 focus:outline-none cursor-pointer font-medium"
                 >
-                  <X className="w-3 h-3" strokeWidth={1.5} />
-                </button>
-              )}
+                  <option value="All">Priority: All</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
             </div>
-
-            {/* Priority Filter */}
-            <div className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-[#E5E7EB] rounded-md text-gray-600">
-              <Filter className="w-3 h-3 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="bg-transparent text-xs text-gray-800 focus:outline-none cursor-pointer"
-              >
-                <option value="All">Priority: All</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-
-            {/* User Switcher */}
-            <UserSwitcher
-              currentUser={currentUser}
-              users={users}
-              onSelectUser={handleSelectUser}
-              onUserCreated={(newUser) => {
-                setUsers((prev) => [...prev, newUser]);
-                showToast(`Added ${newUser.name}`);
-              }}
-            />
-
-            {/* Sync Button */}
-            <button
-              onClick={() => {
-                setIsLoading(true);
-                loadTasks();
-              }}
-              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
-              title="Sync tasks"
-            >
-              <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} />
-            </button>
-
-            {/* + New Task Primary Action */}
-            <button
-              onClick={() => {
-                setEditingTask(null);
-                setIsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-black rounded-md transition-colors shadow-sm flex-shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-              <span>New Task</span>
-            </button>
           </div>
         </div>
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-3">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-3.5 sm:py-5 space-y-3">
         {/* BLOCKER ALERT BANNER */}
         <BlockerAlertBanner
           blockedTask={blockedAlertTask}

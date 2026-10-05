@@ -328,13 +328,13 @@ export function TaskRow({
       </div>
 
       {/* MOBILE STACKED CARD VIEW (< 768px) */}
-      <div className="md:hidden p-4 space-y-2.5">
-        <div className="flex items-start gap-3">
+      <div className="md:hidden p-3.5 space-y-2.5">
+        <div className="flex items-start gap-2.5">
           {/* Touch-Friendly Checkbox (44px min tap area) */}
           <button
             type="button"
             onClick={handleCheckboxClick}
-            className={`flex-shrink-0 w-11 h-11 flex items-center justify-center rounded -ml-2 text-gray-400 active:scale-95 focus:outline-none ${
+            className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded -ml-1 text-gray-400 active:scale-95 focus:outline-none ${
               task.isBlocked ? 'cursor-not-allowed' : 'cursor-pointer'
             }`}
           >
@@ -352,11 +352,13 @@ export function TaskRow({
             )}
           </button>
 
-          <div className="flex-1 min-w-0 pt-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-gray-400">{task.id}</span>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <div className="flex items-start gap-2">
+              <span className="font-mono text-xs text-gray-400 font-medium whitespace-nowrap flex-shrink-0 mt-0.5">
+                {task.id}
+              </span>
               <h3
-                className={`text-sm font-medium leading-snug truncate ${
+                className={`text-sm font-medium leading-snug break-words ${
                   isDone ? 'line-through text-gray-400' : 'text-gray-900'
                 }`}
               >
@@ -366,24 +368,24 @@ export function TaskRow({
 
             {/* Mobile Blocker or Resolved Tag */}
             {task.isBlocked ? (
-              <div className="mt-1 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 {task.blockingTasks.map((blocker) => (
                   <button
                     key={blocker.id}
                     type="button"
                     onClick={() => onScrollToTask?.(blocker.id)}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-mono text-rose-700 bg-rose-50 border border-rose-200 rounded"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-mono text-rose-700 bg-rose-50 border border-rose-200 rounded active:bg-rose-100 transition-colors"
                   >
-                    <AlertCircle className="w-3 h-3 text-rose-600" strokeWidth={1.5} />
-                    <span>Blocked by {blocker.id}</span>
+                    <AlertCircle className="w-3 h-3 text-rose-600 flex-shrink-0" strokeWidth={1.5} />
+                    <span className="whitespace-nowrap">Blocked by {blocker.id}</span>
                   </button>
                 ))}
               </div>
             ) : task.dependencies && task.dependencies.length > 0 ? (
-              <div className="mt-1 flex items-center gap-1">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 rounded">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" strokeWidth={1.5} />
-                  <span>{task.dependencies.length} dep{task.dependencies.length > 1 ? 's' : ''} resolved</span>
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" strokeWidth={1.5} />
+                  <span className="whitespace-nowrap">{task.dependencies.length} dep{task.dependencies.length > 1 ? 's' : ''} resolved</span>
                 </span>
               </div>
             ) : null}
@@ -399,7 +401,13 @@ export function TaskRow({
             <select
               value={task.status}
               onChange={(e) => handleStatusSelect(e.target.value as TaskStatus)}
-              className="h-9 px-2.5 py-1 rounded border border-gray-200 bg-gray-50 text-gray-700 text-xs font-medium focus:outline-none"
+              className={`h-8 px-2 py-0.5 rounded border text-xs font-medium focus:outline-none transition-colors ${
+                isDone
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : isInProgress
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-gray-50 text-gray-700 border-gray-200'
+              }`}
             >
               <option value="To Do">To Do</option>
               <option value="In Progress">In Progress</option>
@@ -420,34 +428,55 @@ export function TaskRow({
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {task.assignee && (
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono text-white"
-                  style={{ backgroundColor: task.assignee.avatarColor }}
-                >
-                  {task.assignee.initials}
-                </div>
-                <span className="text-xs text-gray-600">
-                  {task.assignee.name.split(' ')[0]}
-                </span>
+          <div className="flex items-center gap-2">
+            {/* Interactive Assignee on Mobile */}
+            <div className="relative" title="Change assignee">
+              <select
+                value={task.assignedUserId}
+                onChange={(e) => onAssigneeChange(task, e.target.value)}
+                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center gap-1.5 py-1 px-1.5 rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-colors">
+                {task.assignee ? (
+                  <>
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-mono text-white flex-shrink-0"
+                      style={{ backgroundColor: task.assignee.avatarColor }}
+                    >
+                      {task.assignee.initials}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate max-w-[70px]">
+                      {task.assignee.name.split(' ')[0]}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-400">Assign</span>
+                )}
+                <ChevronDown className="w-2.5 h-2.5 text-gray-400" strokeWidth={1.5} />
               </div>
-            )}
+            </div>
 
             <button
+              type="button"
               onClick={() => onEdit(task)}
-              className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 active:bg-gray-100 rounded transition-colors"
               title="Edit"
             >
-              <Pencil className="w-4 h-4" strokeWidth={1.5} />
+              <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
             <button
+              type="button"
               onClick={() => onDelete(task.id)}
-              className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-rose-600"
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-rose-600 active:bg-rose-50 rounded transition-colors"
               title="Delete"
             >
-              <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           </div>
         </div>
