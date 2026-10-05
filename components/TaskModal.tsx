@@ -168,11 +168,19 @@ export function TaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-100">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-100"
+      onClick={onClose}
+    >
       <div
         className="w-full sm:max-w-lg bg-white border-t sm:border border-[#E5E7EB] rounded-t-2xl sm:rounded-lg shadow-xl flex flex-col max-h-[88vh] sm:max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Sheet Drag Handle */}
+        <div className="pt-2.5 pb-1 flex justify-center sm:hidden bg-white">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
         {/* MODAL HEADER */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E7EB]">
           <div className="flex items-center gap-2">
@@ -213,7 +221,6 @@ export function TaskModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-white border border-[#E5E7EB] rounded-md text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900"
-              autoFocus
             />
           </div>
 

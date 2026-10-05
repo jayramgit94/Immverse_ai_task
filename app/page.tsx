@@ -320,7 +320,7 @@ export default function SmartTaskManager() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans antialiased">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#F9FAFB] text-gray-900 font-sans antialiased">
       {/* HEADER: RESPONSIVE APP BAR */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#E5E7EB] shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <div className="max-w-6xl mx-auto px-3 sm:px-6">
@@ -490,20 +490,16 @@ export default function SmartTaskManager() {
           {/* MOBILE HEADER (< 768px): DEDICATED STRUCTURED MULTI-TIER LAYOUT (NO OVERFLOW/CLIPPING) */}
           <div className="md:hidden py-2.5 space-y-2.5">
             {/* ROW 1: Branding + Session User + Sync + New Task */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-normal select-none">
-                  <span>workspace</span>
-                  <span className="text-gray-300">/</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-900 font-bold text-sm tracking-tight">Tasks</span>
-                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-mono font-medium text-gray-600 bg-gray-100 border border-gray-200/80 rounded-full select-none">
-                    {filteredTasks.length}
-                  </span>
-                </div>
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+              {/* Brand Title & Count */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-gray-900 font-bold text-sm tracking-tight">Tasks</span>
+                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-mono font-medium text-gray-600 bg-gray-100 border border-gray-200/80 rounded-full select-none flex-shrink-0">
+                  {filteredTasks.length}
+                </span>
               </div>
 
+              {/* Right Action Group: Sync, User Switcher, + New */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {/* Sync Button */}
                 <button
@@ -511,7 +507,7 @@ export default function SmartTaskManager() {
                     setIsLoading(true);
                     loadTasks();
                   }}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 active:bg-gray-100 rounded transition-colors"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 active:bg-gray-100 rounded transition-colors flex-shrink-0"
                   title="Sync tasks"
                 >
                   <RotateCw className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -528,13 +524,13 @@ export default function SmartTaskManager() {
                   }}
                 />
 
-                {/* + New Button */}
+                {/* + New Button (Guaranteed fully visible, no overflow) */}
                 <button
                   onClick={() => {
                     setEditingTask(null);
                     setIsModalOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-gray-900 hover:bg-black active:scale-95 rounded-md transition-all shadow-sm flex-shrink-0"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-gray-900 hover:bg-black active:scale-95 rounded-md transition-all shadow-sm flex-shrink-0 whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" strokeWidth={2} />
                   <span>New</span>
