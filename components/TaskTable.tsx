@@ -130,9 +130,16 @@ export function TaskTable({
 
       {/* SUBTLE FOOTER COUNTER */}
       {tasks.length > 0 && (
-        <div className="px-4 py-2 bg-[#FAFAFA] border-t border-[#E5E7EB] flex items-center justify-between text-xs text-gray-400 font-mono">
-          <span>{tasks.length} task{tasks.length > 1 ? 's' : ''}</span>
-          <span className="hidden sm:inline font-sans text-[11px]">
+        <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E7EB] flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center gap-1.5 select-none">
+            <span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium text-gray-600 bg-gray-200/80 rounded-full">
+              {tasks.length}
+            </span>
+            <span className="text-gray-500 font-sans text-xs">
+              task{tasks.length > 1 ? 's' : ''} total
+            </span>
+          </div>
+          <span className="hidden sm:inline font-sans text-[11px] text-gray-400">
             Press Enter on the quick-add row or click "+ New Task"
           </span>
         </div>

@@ -327,49 +327,85 @@ export default function SmartTaskManager() {
           {/* DESKTOP HEADER (>= 768px): SINGLE SLEEK ROW */}
           <div className="hidden md:flex h-14 items-center justify-between gap-4">
             {/* LEFT: Workspace title & Live Tabs */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                <span className="text-gray-400">workspace</span>
-                <span className="text-gray-300">/</span>
-                <span className="text-gray-900 font-semibold text-sm">Tasks</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-normal select-none">
+                  <span>workspace</span>
+                  <span className="text-gray-300">/</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-900 font-semibold text-sm tracking-tight">Tasks</span>
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-mono font-medium text-gray-600 bg-gray-100 border border-gray-200/80 rounded-full select-none">
+                    {filteredTasks.length}
+                  </span>
+                </div>
               </div>
 
               {/* View Switcher Tabs with Live Counts */}
-              <div className="flex items-center p-0.5 bg-gray-100 rounded-md border border-[#E5E7EB]">
+              <div className="flex items-center p-0.5 bg-gray-100 rounded-lg border border-[#E5E7EB]">
                 <button
+                  type="button"
                   onClick={() => setActiveTab('all')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                     activeTab === 'all'
-                      ? 'bg-white text-gray-900 shadow-sm'
+                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
                       : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  All ({tasks.length})
+                  <span className="whitespace-nowrap">All</span>
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                      activeTab === 'all'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200/80 text-gray-600'
+                    }`}
+                  >
+                    {tasks.length}
+                  </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('my-tasks')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                     activeTab === 'my-tasks'
-                      ? 'bg-white text-gray-900 shadow-sm'
+                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
                       : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  My Tasks ({myTasksCount})
+                  <span className="whitespace-nowrap">My Tasks</span>
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                      activeTab === 'my-tasks'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200/80 text-gray-600'
+                    }`}
+                  >
+                    {myTasksCount}
+                  </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setActiveTab('blocked')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                     activeTab === 'blocked'
-                      ? 'bg-white text-gray-900 shadow-sm'
+                      ? 'bg-white text-rose-700 shadow-sm font-semibold'
                       : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
-                  <span>Blocked ({blockedCount})</span>
-                  {blockedCount > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
-                  )}
+                  <span className="whitespace-nowrap">Blocked</span>
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                      blockedCount > 0
+                        ? 'bg-rose-100 text-rose-700 border border-rose-200 font-semibold'
+                        : activeTab === 'blocked'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-200/80 text-gray-600'
+                    }`}
+                  >
+                    {blockedCount}
+                  </span>
                 </button>
               </div>
             </div>
@@ -455,13 +491,17 @@ export default function SmartTaskManager() {
           <div className="md:hidden py-2.5 space-y-2.5">
             {/* ROW 1: Branding + Session User + Sync + New Task */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium min-w-0">
-                <span className="text-gray-400">workspace</span>
-                <span className="text-gray-300">/</span>
-                <span className="text-gray-900 font-bold text-sm tracking-tight">Tasks</span>
-                <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-mono bg-gray-100 text-gray-600 rounded-full border border-gray-200">
-                  {filteredTasks.length}
-                </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-normal select-none">
+                  <span>workspace</span>
+                  <span className="text-gray-300">/</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-900 font-bold text-sm tracking-tight">Tasks</span>
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-mono font-medium text-gray-600 bg-gray-100 border border-gray-200/80 rounded-full select-none">
+                    {filteredTasks.length}
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -505,39 +545,68 @@ export default function SmartTaskManager() {
             {/* ROW 2: Mobile View Switcher Segmented Control */}
             <div className="grid grid-cols-3 p-0.5 bg-gray-100 rounded-lg border border-[#E5E7EB]">
               <button
+                type="button"
                 onClick={() => setActiveTab('all')}
-                className={`py-1.5 text-xs font-medium rounded-md transition-all ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                   activeTab === 'all'
                     ? 'bg-white text-gray-900 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                All ({tasks.length})
+                <span className="whitespace-nowrap">All</span>
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                    activeTab === 'all'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-200/80 text-gray-600'
+                  }`}
+                >
+                  {tasks.length}
+                </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setActiveTab('my-tasks')}
-                className={`py-1.5 text-xs font-medium rounded-md transition-all ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                   activeTab === 'my-tasks'
                     ? 'bg-white text-gray-900 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                My Tasks ({myTasksCount})
+                <span className="whitespace-nowrap">My Tasks</span>
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                    activeTab === 'my-tasks'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-200/80 text-gray-600'
+                  }`}
+                >
+                  {myTasksCount}
+                </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setActiveTab('blocked')}
-                className={`py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1 ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                   activeTab === 'blocked'
-                    ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                    ? 'bg-white text-rose-700 shadow-sm font-semibold'
                     : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                <span>Blocked ({blockedCount})</span>
-                {blockedCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
-                )}
+                <span className="whitespace-nowrap">Blocked</span>
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-mono font-medium rounded-full ${
+                    blockedCount > 0
+                      ? 'bg-rose-100 text-rose-700 font-semibold border border-rose-200'
+                      : activeTab === 'blocked'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-200/80 text-gray-600'
+                  }`}
+                >
+                  {blockedCount}
+                </span>
               </button>
             </div>
 
