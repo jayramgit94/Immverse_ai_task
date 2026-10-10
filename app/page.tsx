@@ -105,9 +105,11 @@ export default function SmartTaskManager() {
   };
 
   // Fetch Tasks from GET /api/todos with offline fallback
-  const loadTasks = async (userList?: User[]) => {
+  const loadTasks = async (userList?: User[], silent: boolean = false) => {
     const activeUsers = userList && userList.length > 0 ? userList : users.length > 0 ? users : SEED_USERS;
-    setIsLoading(true);
+    if (!silent) {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch('/api/todos');
       if (!res.ok) {
@@ -133,37 +135,41 @@ export default function SmartTaskManager() {
       const enriched = enrichTasks(todosArray, activeUsers);
       setTasks(enriched);
     } catch (err) {
-      console.warn('Network call to /api/todos failed, falling back to localStorage:', err);
-      // Fallback to localStorage cache in case device temporarily loses connectivity
-      let restored = false;
-      try {
-        const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const enriched = enrichTasks(parsed, activeUsers);
-            setTasks(enriched);
-            restored = true;
-            showToast('Loaded tasks from local cache', 'warning');
+      if (!silent) {
+        console.warn('Network call to /api/todos failed, falling back to localStorage:', err);
+        // Fallback to localStorage cache in case device temporarily loses connectivity
+        let restored = false;
+        try {
+          const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const enriched = enrichTasks(parsed, activeUsers);
+              setTasks(enriched);
+              restored = true;
+              showToast('Loaded tasks from local cache', 'warning');
+            }
           }
+        } catch (cacheErr) {
+          console.warn('Error reading from localStorage cache', cacheErr);
         }
-      } catch (cacheErr) {
-        console.warn('Error reading from localStorage cache', cacheErr);
-      }
 
-      if (!restored) {
-        // If first launch without credentials or local cache, initialize with seed tasks
-        const enrichedSeed = enrichTasks(SEED_TASKS, activeUsers);
-        setTasks(enrichedSeed);
-        showToast(
-          err instanceof Error
-            ? `Sync error (${err.message}). Showing offline tasks.`
-            : 'Offline mode: loaded offline tasks.',
-          'warning'
-        );
+        if (!restored) {
+          // If first launch without credentials or local cache, initialize with seed tasks
+          const enrichedSeed = enrichTasks(SEED_TASKS, activeUsers);
+          setTasks(enrichedSeed);
+          showToast(
+            err instanceof Error
+              ? `Sync error (${err.message}). Showing offline tasks.`
+              : 'Offline mode: loaded offline tasks.',
+            'warning'
+          );
+        }
       }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -180,6 +186,30 @@ export default function SmartTaskManager() {
       isMounted = false;
     };
   }, []);
+
+  // Background auto-refresh: automatically sync and reflect any changes without page reload
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadTasks(undefined, true);
+      }
+    }, 6000);
+
+    const handleFocusOrVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadTasks(undefined, true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleFocusOrVisible);
+    window.addEventListener('focus', handleFocusOrVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleFocusOrVisible);
+      window.removeEventListener('focus', handleFocusOrVisible);
+    };
+  }, [users]);
 
   // Filtered tasks
   const filteredTasks = useMemo(() => {

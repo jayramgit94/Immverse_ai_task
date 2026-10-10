@@ -101,10 +101,44 @@ export default async function handler(req, res) {
         });
       }
 
+      // If request contains user creation payload (e.g. { user: ... } or { name, email })
+      if (body && (body.user || (body.name && body.email))) {
+        const userPayload = body.user || body;
+        const name = (userPayload.name || '').trim();
+        const email = (userPayload.email || '').trim().toLowerCase();
+        const initials = name
+          ? name
+              .split(' ')
+              .filter(Boolean)
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()
+          : 'U';
+
+        const newUser = {
+          id: userPayload.id || `USR-${Date.now().toString(36).toUpperCase()}`,
+          name: name || 'New User',
+          email: email || 'user@company.internal',
+          role: (userPayload.role || 'Team Member').trim(),
+          initials: initials || 'U',
+          avatarColor: '#2563EB',
+        };
+
+        return res.status(201).json({
+          success: true,
+          message: `Registered user ${newUser.name}`,
+          data: newUser,
+          user: newUser,
+        });
+      }
+
       const todos = Array.isArray(body)
         ? body
         : body && Array.isArray(body.todos)
         ? body.todos
+        : body && typeof body === 'object' && body.title
+        ? [body]
         : null;
 
       if (!todos) {

@@ -37,9 +37,31 @@ export function TaskRow({
 }: TaskRowProps) {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const [statusOpenUpward, setStatusOpenUpward] = useState(false);
 
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
+
+  const toggleAssigneeDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showAssigneeDropdown && assigneeDropdownRef.current) {
+      const rect = assigneeDropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 250);
+    }
+    setShowAssigneeDropdown((prev) => !prev);
+  };
+
+  const toggleStatusDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showStatusDropdown && statusDropdownRef.current) {
+      const rect = statusDropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setStatusOpenUpward(spaceBelow < 180);
+    }
+    setShowStatusDropdown((prev) => !prev);
+  };
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -200,7 +222,7 @@ export function TaskRow({
         >
           <button
             type="button"
-            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+            onClick={toggleStatusDropdown}
             className={`inline-flex items-center justify-between w-28 px-2 py-1 text-xs rounded border transition-colors ${
               isDone
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -214,7 +236,13 @@ export function TaskRow({
           </button>
 
           {showStatusDropdown && (
-            <div className="absolute left-0 mt-1 w-32 bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
+            <div
+              className={`absolute left-0 w-32 bg-white border border-[#E5E7EB] rounded-md shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
+                statusOpenUpward
+                  ? 'bottom-full mb-1.5 origin-bottom-left'
+                  : 'top-full mt-1.5 origin-top-left'
+              }`}
+            >
               {(['To Do', 'In Progress', 'Done'] as TaskStatus[]).map((s) => {
                 const isSelected = task.status === s;
                 return (
@@ -247,7 +275,7 @@ export function TaskRow({
         >
           <button
             type="button"
-            onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+            onClick={toggleAssigneeDropdown}
             className="flex items-center gap-2 p-1 -m-1 rounded hover:bg-gray-100 transition-colors text-left max-w-full"
             title="Click to reassign"
           >
@@ -269,8 +297,14 @@ export function TaskRow({
           </button>
 
           {showAssigneeDropdown && (
-            <div className="absolute right-0 mt-1 w-44 bg-white border border-[#E5E7EB] rounded-md shadow-lg py-1 z-20 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-2.5 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+            <div
+              className={`absolute right-0 w-48 bg-white border border-[#E5E7EB] rounded-md shadow-xl py-1 z-50 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 ${
+                openUpward
+                  ? 'bottom-full mb-1.5 origin-bottom-right'
+                  : 'top-full mt-1.5 origin-top-right'
+              }`}
+            >
+              <div className="px-2.5 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-white border-b border-gray-100 z-10">
                 Reassign to
               </div>
               {users.map((u) => {

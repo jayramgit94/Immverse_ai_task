@@ -89,9 +89,9 @@ export function TaskTable({
   };
 
   return (
-    <div className="bg-white border border-[#E5E7EB] rounded-lg overflow-hidden shadow-sm">
+    <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-sm">
       {/* DESKTOP TABLE HEADER */}
-      <div className="hidden md:flex items-center px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E7EB] text-xs font-medium text-gray-500 select-none">
+      <div className="hidden md:flex items-center px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E7EB] text-xs font-medium text-gray-500 select-none rounded-t-lg">
         <span className="flex-1 min-w-0 font-normal">Task</span>
         <span className="w-24 flex-shrink-0 font-normal">Priority</span>
         <span className="w-32 flex-shrink-0 font-normal">Status</span>
@@ -167,7 +167,7 @@ export function TaskTable({
 
       {/* PAGINATION & FOOTER CONTROLS */}
       {totalTasks > 0 && (
-        <div className="px-3.5 sm:px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs select-none">
+        <div className="px-3.5 sm:px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E7EB] flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs select-none rounded-b-lg">
           {/* LEFT: Range info + Page Size selector */}
           <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-1.5 text-gray-600">
