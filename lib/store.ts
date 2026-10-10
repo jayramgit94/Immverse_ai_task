@@ -11,7 +11,7 @@ import {
 } from './types';
 
 // Initial Seed Users
-const SEED_USERS: User[] = [
+export const SEED_USERS: User[] = [
   {
     id: 'USR-1',
     name: 'Alex Rivera',
@@ -47,7 +47,7 @@ const SEED_USERS: User[] = [
 ];
 
 // Initial Seed Tasks with intentional dependency relationships
-const SEED_TASKS: Task[] = [
+export const SEED_TASKS: Task[] = [
   {
     id: 'TSK-101',
     title: 'Audit design tokens and color contrast for WCAG 2.1 AA',
