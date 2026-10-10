@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +9,39 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+function getCredentials() {
+  let githubToken = process.env.GITHUB_TOKEN;
+  let gistId = process.env.GIST_ID;
+
+  if (!githubToken || !gistId) {
+    try {
+      const candidates = ['.env.local', '.env'];
+      for (const candidate of candidates) {
+        const fullPath = path.resolve(process.cwd(), candidate);
+        if (fs.existsSync(fullPath)) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          for (const line of content.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('GITHUB_TOKEN=') && !githubToken) {
+              githubToken = trimmed.replace('GITHUB_TOKEN=', '').trim().replace(/^["']|["']$/g, '');
+            }
+            if (trimmed.startsWith('GIST_ID=') && !gistId) {
+              gistId = trimmed.replace('GIST_ID=', '').trim().replace(/^["']|["']$/g, '');
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return {
+    githubToken: githubToken || '',
+    gistId: gistId || '',
+  };
+}
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -17,8 +52,7 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const gistId = process.env.GIST_ID;
-    const githubToken = process.env.GITHUB_TOKEN;
+    const { gistId, githubToken } = getCredentials();
 
     if (!gistId || !githubToken) {
       return NextResponse.json(
@@ -137,8 +171,7 @@ export async function POST(req) {
       );
     }
 
-    const gistId = process.env.GIST_ID;
-    const githubToken = process.env.GITHUB_TOKEN;
+    const { gistId, githubToken } = getCredentials();
 
     if (!gistId || !githubToken) {
       return NextResponse.json(

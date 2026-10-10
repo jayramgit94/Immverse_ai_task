@@ -28,11 +28,13 @@ import {
 } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'todos_cache';
+const USERS_CACHE_KEY = 'workspace_custom_users';
+const ACTIVE_USER_ID_KEY = 'workspace_active_user_id';
 
 export default function SmartTaskManager() {
   const [tasks, setTasks] = useState<TaskWithDetails[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>(SEED_USERS);
+  const [currentUser, setCurrentUser] = useState<User | null>(SEED_USERS[0]);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
@@ -51,36 +53,66 @@ export default function SmartTaskManager() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch Users
+  // Fetch & Restore Users with persistent custom users & active session
   const loadUsers = async (): Promise<User[]> => {
+    // 1. Read custom created users from localStorage
+    let cachedCustomUsers: User[] = [];
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem(USERS_CACHE_KEY) : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          cachedCustomUsers = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading cached custom users', e);
+    }
+
+    // 2. Fetch server users
+    let serverUsers: User[] = [];
     try {
       const res = await fetch('/api/users');
       const data = await res.json();
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        setUsers(data.data);
-        if (!currentUser) {
-          setCurrentUser(data.data[0]);
-        }
-        return data.data;
+        serverUsers = data.data;
       }
     } catch {
       // Offline fallback
     }
-    setUsers(SEED_USERS);
-    if (!currentUser && SEED_USERS.length > 0) {
-      setCurrentUser(SEED_USERS[0]);
-    }
-    return SEED_USERS;
+
+    // 3. Merge SEED_USERS, server users, and custom users uniquely by ID
+    const userMap = new Map<string, User>();
+    for (const u of SEED_USERS) userMap.set(u.id, u);
+    for (const u of serverUsers) userMap.set(u.id, u);
+    for (const u of cachedCustomUsers) userMap.set(u.id, u);
+
+    const mergedUsers = Array.from(userMap.values());
+    setUsers(mergedUsers);
+
+    // 4. Restore active user session from localStorage
+    let restoredUser: User | null = null;
+    try {
+      const savedActiveId = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_USER_ID_KEY) : null;
+      if (savedActiveId) {
+        restoredUser = mergedUsers.find((u) => u.id === savedActiveId) || null;
+      }
+    } catch (e) {}
+
+    const selected = restoredUser || mergedUsers[0] || SEED_USERS[0];
+    setCurrentUser(selected);
+    return mergedUsers;
   };
 
-  // Fetch Tasks from GET /api/todos with offline localStorage fallback
+  // Fetch Tasks from GET /api/todos with offline fallback
   const loadTasks = async (userList?: User[]) => {
     const activeUsers = userList && userList.length > 0 ? userList : users.length > 0 ? users : SEED_USERS;
     setIsLoading(true);
     try {
       const res = await fetch('/api/todos');
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
       let todosArray: any[] = [];
@@ -108,11 +140,11 @@ export default function SmartTaskManager() {
         const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
             const enriched = enrichTasks(parsed, activeUsers);
             setTasks(enriched);
             restored = true;
-            showToast('Offline fallback: Loaded tasks from local cache', 'warning');
+            showToast('Loaded tasks from local cache', 'warning');
           }
         }
       } catch (cacheErr) {
@@ -123,7 +155,12 @@ export default function SmartTaskManager() {
         // If first launch without credentials or local cache, initialize with seed tasks
         const enrichedSeed = enrichTasks(SEED_TASKS, activeUsers);
         setTasks(enrichedSeed);
-        showToast('Offline mode: Set GITHUB_TOKEN & GIST_ID in .env.local to sync with Gist', 'warning');
+        showToast(
+          err instanceof Error
+            ? `Sync error (${err.message}). Showing offline tasks.`
+            : 'Offline mode: loaded offline tasks.',
+          'warning'
+        );
       }
     } finally {
       setIsLoading(false);
@@ -183,9 +220,17 @@ export default function SmartTaskManager() {
     return currentUser ? tasks.filter((t) => t.assignedUserId === currentUser.id).length : 0;
   }, [tasks, currentUser]);
 
-  // Switch session user
+  // Switch session user & persist active session to localStorage
   const handleSelectUser = async (user: User) => {
     setCurrentUser(user);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(ACTIVE_USER_ID_KEY, user.id);
+      }
+    } catch (e) {
+      console.warn('Failed to persist active user', e);
+    }
+
     try {
       await fetch('/api/auth/login', {
         method: 'POST',
@@ -196,6 +241,26 @@ export default function SmartTaskManager() {
     } catch {
       showToast(`Active session: ${user.name}`);
     }
+  };
+
+  // Add new team member & persist to custom users cache in localStorage
+  const handleUserCreated = (newUser: User) => {
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === newUser.id);
+      const updated = exists ? prev : [...prev, newUser];
+      try {
+        if (typeof window !== 'undefined') {
+          const custom = updated.filter((u) => !SEED_USERS.some((s) => s.id === u.id));
+          localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(custom));
+        }
+      } catch (e) {
+        console.warn('Failed to cache new user', e);
+      }
+      return updated;
+    });
+
+    handleSelectUser(newUser);
+    showToast(`Added and switched to ${newUser.name}`);
   };
 
   // Jump to and highlight a specific task (e.g. from a blocker link)
@@ -588,10 +653,7 @@ export default function SmartTaskManager() {
                 currentUser={currentUser}
                 users={users}
                 onSelectUser={handleSelectUser}
-                onUserCreated={(newUser) => {
-                  setUsers((prev) => [...prev, newUser]);
-                  showToast(`Added ${newUser.name}`);
-                }}
+                onUserCreated={handleUserCreated}
               />
 
               {/* Sync Button */}
@@ -651,10 +713,7 @@ export default function SmartTaskManager() {
                   currentUser={currentUser}
                   users={users}
                   onSelectUser={handleSelectUser}
-                  onUserCreated={(newUser) => {
-                    setUsers((prev) => [...prev, newUser]);
-                    showToast(`Added ${newUser.name}`);
-                  }}
+                  onUserCreated={handleUserCreated}
                 />
 
                 {/* + New Button (Guaranteed fully visible, no overflow) */}

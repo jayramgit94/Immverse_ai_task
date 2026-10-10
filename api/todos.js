@@ -1,3 +1,39 @@
+import fs from 'fs';
+import path from 'path';
+
+function getCredentials() {
+  let githubToken = process.env.GITHUB_TOKEN;
+  let gistId = process.env.GIST_ID;
+
+  if (!githubToken || !gistId) {
+    try {
+      const candidates = ['.env.local', '.env'];
+      for (const candidate of candidates) {
+        const fullPath = path.resolve(process.cwd(), candidate);
+        if (fs.existsSync(fullPath)) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          for (const line of content.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('GITHUB_TOKEN=') && !githubToken) {
+              githubToken = trimmed.replace('GITHUB_TOKEN=', '').trim().replace(/^["']|["']$/g, '');
+            }
+            if (trimmed.startsWith('GIST_ID=') && !gistId) {
+              gistId = trimmed.replace('GIST_ID=', '').trim().replace(/^["']|["']$/g, '');
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return {
+    githubToken: githubToken || '',
+    gistId: gistId || '',
+  };
+}
+
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,11 +44,10 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
+  const { gistId, githubToken } = getCredentials();
+
   try {
     if (req.method === 'GET') {
-      const gistId = process.env.GIST_ID;
-      const githubToken = process.env.GITHUB_TOKEN;
-
       if (!gistId || !githubToken) {
         return res.status(500).json({
           success: false,
@@ -78,9 +113,6 @@ export default async function handler(req, res) {
           error: 'Request body must be an array of todos or contain a todos array.',
         });
       }
-
-      const gistId = process.env.GIST_ID;
-      const githubToken = process.env.GITHUB_TOKEN;
 
       if (!gistId || !githubToken) {
         return res.status(500).json({
