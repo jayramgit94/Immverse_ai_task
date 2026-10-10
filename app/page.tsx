@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   TaskWithDetails,
   User,
@@ -9,10 +9,7 @@ import {
   ViewTab,
   CreateTaskInput,
   UpdateTaskInput,
-  Task,
 } from '@/lib/types';
-import { SEED_USERS, SEED_TASKS } from '@/lib/store';
-import { enrichTasks, detectCycle, generateNextTaskId } from '@/lib/todoSync';
 import { UserSwitcher } from '@/components/UserSwitcher';
 import { TaskTable } from '@/components/TaskTable';
 import { TaskModal } from '@/components/TaskModal';
@@ -27,30 +24,15 @@ import {
   RotateCw,
 } from 'lucide-react';
 
-const LOCAL_STORAGE_KEY = 'todos_cache';
-const USERS_CACHE_KEY = 'workspace_custom_users';
-const ACTIVE_USER_ID_KEY = 'workspace_active_user_id';
-
 export default function SmartTaskManager() {
   const [tasks, setTasks] = useState<TaskWithDetails[]>([]);
-  const [users, setUsers] = useState<User[]>(SEED_USERS);
-  const [currentUser, setCurrentUser] = useState<User | null>(SEED_USERS[0]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
-
-  const usersRef = useRef<User[]>(users);
-  const tasksRef = useRef<TaskWithDetails[]>(tasks);
-
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
-
-  useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
 
   // Modals & Feedback
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,183 +46,64 @@ export default function SmartTaskManager() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch & Restore Users with persistent custom users & active session
-  const loadUsers = async (): Promise<User[]> => {
-    // 1. Read custom created users from localStorage
-    let cachedCustomUsers: User[] = [];
-    try {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem(USERS_CACHE_KEY) : null;
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          cachedCustomUsers = parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading cached custom users', e);
-    }
-
-    // 2. Fetch server users
-    let serverUsers: User[] = [];
+  // Fetch Users
+  const loadUsers = async () => {
     try {
       const res = await fetch('/api/users');
       const data = await res.json();
-      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        serverUsers = data.data;
+      if (data.success && data.data) {
+        setUsers(data.data);
+        if (!currentUser && data.data.length > 0) {
+          setCurrentUser(data.data[0]);
+        }
       }
     } catch {
-      // Offline fallback
+      showToast('Could not load team members', 'error');
     }
-
-    // 3. Merge SEED_USERS, server users, and custom users uniquely by ID
-    const userMap = new Map<string, User>();
-    for (const u of SEED_USERS) userMap.set(u.id, u);
-    for (const u of serverUsers) userMap.set(u.id, u);
-    for (const u of cachedCustomUsers) userMap.set(u.id, u);
-
-    const mergedUsers = Array.from(userMap.values());
-    setUsers(mergedUsers);
-
-    // 4. Restore active user session from localStorage
-    let restoredUser: User | null = null;
-    try {
-      const savedActiveId = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_USER_ID_KEY) : null;
-      if (savedActiveId) {
-        restoredUser = mergedUsers.find((u) => u.id === savedActiveId) || null;
-      }
-    } catch (e) {}
-
-    const selected = restoredUser || mergedUsers[0] || SEED_USERS[0];
-    setCurrentUser(selected);
-    return mergedUsers;
   };
 
-  // Fetch Tasks from GET /api/todos with offline fallback
-  const loadTasks = async (userList?: User[], silent: boolean = false) => {
-    const activeUsers = userList && userList.length > 0 ? userList : users.length > 0 ? users : SEED_USERS;
-    if (!silent) {
-      setIsLoading(true);
-    }
+  // Fetch Tasks with optional silent background refresh
+  const loadTasks = async (silent: boolean = false) => {
+    if (!silent) setIsLoading(true);
     try {
-      const res = await fetch('/api/todos');
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.error || `HTTP ${res.status}`);
-      }
+      const res = await fetch('/api/tasks');
       const data = await res.json();
-      let todosArray: any[] = [];
-      if (Array.isArray(data)) {
-        todosArray = data;
-      } else if (data && Array.isArray(data.todos)) {
-        todosArray = data.todos;
+      if (data.success && data.data) {
+        setTasks(data.data);
       }
-
-      // Offline Fallback Caching:
-      // Cache the latest successfully fetched tasks in localStorage as a fallback
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(todosArray));
-      } catch (cacheErr) {
-        console.warn('Could not cache tasks in localStorage', cacheErr);
-      }
-
-      if (todosArray.length === 0) {
-        try {
-          const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              todosArray = parsed;
-            }
-          }
-        } catch {}
-        if (todosArray.length === 0) {
-          todosArray = SEED_TASKS;
-        }
-      }
-
-      const enriched = enrichTasks(todosArray, activeUsers);
-      const currentSignature = tasksRef.current
-        .map((t) => `${t.id}:${t.status}:${t.assignedUserId}:${t.title}:${(t.dependencyIds || []).join(',')}`)
-        .join('|');
-      const incomingSignature = enriched
-        .map((t) => `${t.id}:${t.status}:${t.assignedUserId}:${t.title}:${(t.dependencyIds || []).join(',')}`)
-        .join('|');
-
-      if (currentSignature !== incomingSignature) {
-        setTasks(enriched);
-      }
-    } catch (err) {
-      if (!silent) {
-        console.warn('Network call to /api/todos failed, falling back to localStorage:', err);
-        let restored = false;
-        try {
-          const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const enriched = enrichTasks(parsed, activeUsers);
-              setTasks(enriched);
-              restored = true;
-              showToast('Loaded tasks from local cache', 'warning');
-            }
-          }
-        } catch (cacheErr) {
-          console.warn('Error reading from localStorage cache', cacheErr);
-        }
-
-        if (!restored) {
-          const enrichedSeed = enrichTasks(SEED_TASKS, activeUsers);
-          setTasks(enrichedSeed);
-          showToast(
-            err instanceof Error
-              ? `Sync error (${err.message}). Showing offline tasks.`
-              : 'Offline mode: loaded offline tasks.',
-            'warning'
-          );
-        }
-      }
+    } catch {
+      if (!silent) showToast('Could not load workspace tasks', 'error');
     } finally {
-      if (!silent) {
-        setIsLoading(false);
-      }
+      if (!silent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const initialize = async () => {
-      const loadedUsers = await loadUsers();
-      if (isMounted) {
-        await loadTasks(loadedUsers);
-      }
-    };
-    initialize();
-    return () => {
-      isMounted = false;
-    };
+    loadUsers();
+    loadTasks();
   }, []);
 
-  // Background auto-refresh: automatically sync and reflect any changes without page reload
+  // Background auto-refresh: automatically syncs updates without full-page reloads
   useEffect(() => {
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        loadTasks(usersRef.current, true);
+        loadTasks(true);
       }
     }, 6000);
 
-    const handleFocusOrVisible = () => {
+    const handleFocus = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        loadTasks(usersRef.current, true);
+        loadTasks(true);
       }
     };
 
-    window.addEventListener('visibilitychange', handleFocusOrVisible);
-    window.addEventListener('focus', handleFocusOrVisible);
+    window.addEventListener('visibilitychange', handleFocus);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('visibilitychange', handleFocusOrVisible);
-      window.removeEventListener('focus', handleFocusOrVisible);
+      window.removeEventListener('visibilitychange', handleFocus);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -283,17 +146,9 @@ export default function SmartTaskManager() {
     return currentUser ? tasks.filter((t) => t.assignedUserId === currentUser.id).length : 0;
   }, [tasks, currentUser]);
 
-  // Switch session user & persist active session to localStorage
+  // Switch session user
   const handleSelectUser = async (user: User) => {
     setCurrentUser(user);
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(ACTIVE_USER_ID_KEY, user.id);
-      }
-    } catch (e) {
-      console.warn('Failed to persist active user', e);
-    }
-
     try {
       await fetch('/api/auth/login', {
         method: 'POST',
@@ -304,26 +159,6 @@ export default function SmartTaskManager() {
     } catch {
       showToast(`Active session: ${user.name}`);
     }
-  };
-
-  // Add new team member & persist to custom users cache in localStorage
-  const handleUserCreated = (newUser: User) => {
-    setUsers((prev) => {
-      const exists = prev.some((u) => u.id === newUser.id);
-      const updated = exists ? prev : [...prev, newUser];
-      try {
-        if (typeof window !== 'undefined') {
-          const custom = updated.filter((u) => !SEED_USERS.some((s) => s.id === u.id));
-          localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(custom));
-        }
-      } catch (e) {
-        console.warn('Failed to cache new user', e);
-      }
-      return updated;
-    });
-
-    handleSelectUser(newUser);
-    showToast(`Added and switched to ${newUser.name}`);
   };
 
   // Jump to and highlight a specific task (e.g. from a blocker link)
@@ -349,55 +184,6 @@ export default function SmartTaskManager() {
     showToast(`Jumped to prerequisite ${taskId}${taskObj ? `: "${taskObj.title}"` : ''}`);
   };
 
-  // Central Optimistic State Synchronization
-  const syncTodos = async (
-    updatedTasks: TaskWithDetails[],
-    previousTasks: TaskWithDetails[],
-    successMessage?: string
-  ): Promise<boolean> => {
-    // 1. Optimistic Update: Immediately update UI for zero perceived latency
-    setTasks(updatedTasks);
-
-    // 2. Cache in localStorage
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedTasks));
-    } catch (e) {
-      console.warn('Failed to update localStorage cache', e);
-    }
-
-    // 3. Send updated array to POST /api/todos
-    try {
-      const res = await fetch('/api/todos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTasks),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        console.warn('Remote sync notice:', data?.error || res.status);
-        showToast(
-          successMessage ? `${successMessage} (Saved locally)` : 'Saved locally in workspace cache',
-          'warning'
-        );
-        return true;
-      }
-
-      if (successMessage) {
-        showToast(successMessage, 'success');
-      }
-      return true;
-    } catch (err) {
-      console.warn('Network call failed, maintaining optimistic local state:', err);
-      showToast(
-        successMessage ? `${successMessage} (Saved locally)` : 'Saved locally in workspace cache',
-        'warning'
-      );
-      return true;
-    }
-  };
-
   // Inline Status Change with Blocker Guardrail
   const handleStatusChange = async (task: TaskWithDetails, nextStatus: TaskStatus) => {
     if (nextStatus === 'Done' && task.isBlocked) {
@@ -407,13 +193,37 @@ export default function SmartTaskManager() {
 
     setBlockedAlertTask(null);
 
+    // Optimistic UI update
     const previousTasks = [...tasks];
-    const updatedRaw = tasks.map((t) =>
-      t.id === task.id ? { ...t, status: nextStatus, updatedAt: new Date().toISOString() } : t
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
     );
 
-    const enrichedUpdated = enrichTasks(updatedRaw, users);
-    await syncTodos(enrichedUpdated, previousTasks, `${task.id} marked as ${nextStatus}`);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setTasks(previousTasks);
+        showToast(data.error || 'Cannot update task status', 'error');
+        if (task.isBlocked) {
+          handleBlockedAttempt(task);
+        }
+        return;
+      }
+
+      // Refresh to update dependent statuses across the workspace graph
+      await loadTasks();
+      showToast(`${task.id} marked as ${nextStatus}`);
+    } catch {
+      setTasks(previousTasks);
+      showToast('Network error while updating task', 'error');
+    }
   };
 
   // Inline Assignee Change
@@ -421,16 +231,33 @@ export default function SmartTaskManager() {
     const assignee = users.find((u) => u.id === newUserId);
     const previousTasks = [...tasks];
 
-    const updatedRaw = tasks.map((t) =>
-      t.id === task.id ? { ...t, assignedUserId: newUserId, updatedAt: new Date().toISOString() } : t
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id ? { ...t, assignedUserId: newUserId, assignee } : t
+      )
     );
 
-    const enrichedUpdated = enrichTasks(updatedRaw, users);
-    await syncTodos(
-      enrichedUpdated,
-      previousTasks,
-      `Reassigned ${task.id} to ${assignee ? assignee.name.split(' ')[0] : 'teammate'}`
-    );
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedUserId: newUserId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setTasks(previousTasks);
+        showToast(data.error || 'Failed to reassign task', 'error');
+        return;
+      }
+
+      showToast(`Reassigned ${task.id} to ${assignee?.name.split(' ')[0]}`);
+      await loadTasks();
+    } catch {
+      setTasks(previousTasks);
+      showToast('Network error while reassigning task', 'error');
+    }
   };
 
   // Blocked Attempt Handler (gentle alert & toast)
@@ -440,29 +267,31 @@ export default function SmartTaskManager() {
     showToast(`Cannot complete ${task.id}: blocked by ${blockerNames}`, 'warning');
   };
 
-  // Inline Quick Task Creation
+  // Inline Quick Task Creation (Linear / Notion style: Enter to create)
   const handleQuickCreate = async (title: string) => {
-    if (!title.trim()) return;
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          priority: 'Medium',
+          status: 'To Do',
+          assignedUserId: currentUser?.id || users[0]?.id || 'USR-1',
+          dependencyIds: [],
+        }),
+      });
 
-    const previousTasks = [...tasks];
-    const newId = generateNextTaskId(tasks);
-    const now = new Date().toISOString();
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not create task');
+      }
 
-    const newTask: Task = {
-      id: newId,
-      title: title.trim(),
-      description: '',
-      priority: 'Medium',
-      status: 'To Do',
-      assignedUserId: currentUser?.id || users[0]?.id || 'USR-1',
-      dependencyIds: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const updatedRaw = [newTask, ...tasks];
-    const enrichedUpdated = enrichTasks(updatedRaw, users);
-    await syncTodos(enrichedUpdated, previousTasks, `Created ${newId}`);
+      showToast(`Created ${data.data?.id}`);
+      await loadTasks();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Error creating task', 'error');
+    }
   };
 
   // Full Task Save (Modal Sheet)
@@ -470,112 +299,49 @@ export default function SmartTaskManager() {
     payload: CreateTaskInput | UpdateTaskInput,
     isEdit: boolean
   ): Promise<{ success: boolean; error?: string }> => {
-    const previousTasks = [...tasks];
-    const now = new Date().toISOString();
+    try {
+      const url = isEdit && editingTask ? `/api/tasks/${editingTask.id}` : '/api/tasks';
+      const method = isEdit ? 'PATCH' : 'POST';
 
-    if (isEdit && editingTask) {
-      if (payload.dependencyIds && detectCycle(editingTask.id, payload.dependencyIds, tasks)) {
-        const errorMsg = 'Cannot update dependencies: circular dependency detected.';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        const errorMsg = data.error || 'Server rejected update';
         showToast(errorMsg, 'error');
         return { success: false, error: errorMsg };
       }
 
-      if (payload.status === 'Done') {
-        const deps = payload.dependencyIds || editingTask.dependencyIds || [];
-        const pendingBlockers = deps
-          .map((id) => tasks.find((t) => t.id === id))
-          .filter((t) => t && t.status !== 'Done');
-
-        if (pendingBlockers.length > 0) {
-          const errorMsg = `Cannot mark task as Done: blocked by pending prerequisite(s): ${pendingBlockers
-            .map((b) => b?.id)
-            .join(', ')}.`;
-          showToast(errorMsg, 'error');
-          return { success: false, error: errorMsg };
-        }
-      }
-
-      const updatedRaw = tasks.map((t) =>
-        t.id === editingTask.id
-          ? {
-              ...t,
-              title: payload.title !== undefined ? payload.title.trim() : t.title,
-              description: payload.description !== undefined ? payload.description.trim() : t.description,
-              priority: payload.priority || t.priority,
-              status: payload.status || t.status,
-              assignedUserId: payload.assignedUserId || t.assignedUserId,
-              dependencyIds: payload.dependencyIds !== undefined ? payload.dependencyIds : t.dependencyIds,
-              updatedAt: now,
-            }
-          : t
-      );
-
-      const enrichedUpdated = enrichTasks(updatedRaw, users);
+      showToast(isEdit ? `Saved ${editingTask?.id}` : `Created ${data.data?.id}`);
       setEditingTask(null);
-
-      const success = await syncTodos(enrichedUpdated, previousTasks, `Saved ${editingTask.id}`);
-      return { success, error: success ? undefined : 'Failed to sync update to remote Gist' };
-    } else {
-      const newId = generateNextTaskId(tasks);
-      const targetStatus = payload.status || 'To Do';
-
-      if (payload.dependencyIds && payload.dependencyIds.length > 0) {
-        if (detectCycle(newId, payload.dependencyIds, tasks)) {
-          const errorMsg = 'Cannot create task: circular dependency detected.';
-          showToast(errorMsg, 'error');
-          return { success: false, error: errorMsg };
-        }
-      }
-
-      if (targetStatus === 'Done') {
-        const deps = payload.dependencyIds || [];
-        const pendingBlockers = deps
-          .map((id) => tasks.find((t) => t.id === id))
-          .filter((t) => t && t.status !== 'Done');
-
-        if (pendingBlockers.length > 0) {
-          const errorMsg = `Cannot create task as Done: blocked by pending prerequisite(s): ${pendingBlockers
-            .map((b) => b?.id)
-            .join(', ')}.`;
-          showToast(errorMsg, 'error');
-          return { success: false, error: errorMsg };
-        }
-      }
-
-      const newTask: Task = {
-        id: newId,
-        title: (payload.title || '').trim(),
-        description: (payload.description || '').trim(),
-        priority: payload.priority || 'Medium',
-        status: targetStatus,
-        assignedUserId: payload.assignedUserId || currentUser?.id || users[0]?.id || 'USR-1',
-        dependencyIds: payload.dependencyIds || [],
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const updatedRaw = [newTask, ...tasks];
-      const enrichedUpdated = enrichTasks(updatedRaw, users);
-
-      const success = await syncTodos(enrichedUpdated, previousTasks, `Created ${newId}`);
-      return { success, error: success ? undefined : 'Failed to save new task to remote Gist' };
+      await loadTasks();
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Error saving task';
+      showToast(errorMsg, 'error');
+      return { success: false, error: errorMsg };
     }
   };
 
   // Delete Task with Cascade Cleanup
   const handleDeleteTask = async (id: string) => {
-    const previousTasks = [...tasks];
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      const data = await res.json();
 
-    const updatedRaw = tasks
-      .filter((t) => t.id !== id)
-      .map((t) => ({
-        ...t,
-        dependencyIds: (t.dependencyIds || []).filter((depId) => depId !== id),
-        updatedAt: t.dependencyIds?.includes(id) ? new Date().toISOString() : t.updatedAt,
-      }));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not delete task');
+      }
 
-    const enrichedUpdated = enrichTasks(updatedRaw, users);
-    await syncTodos(enrichedUpdated, previousTasks, `Deleted ${id} and cleaned dependencies`);
+      showToast(`Deleted ${id} and cleaned dependencies`);
+      await loadTasks();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Error deleting task', 'error');
+    }
   };
 
   return (
@@ -714,7 +480,10 @@ export default function SmartTaskManager() {
                 currentUser={currentUser}
                 users={users}
                 onSelectUser={handleSelectUser}
-                onUserCreated={handleUserCreated}
+                onUserCreated={(newUser) => {
+                  setUsers((prev) => [...prev, newUser]);
+                  showToast(`Added ${newUser.name}`);
+                }}
               />
 
               {/* Sync Button */}
@@ -774,7 +543,10 @@ export default function SmartTaskManager() {
                   currentUser={currentUser}
                   users={users}
                   onSelectUser={handleSelectUser}
-                  onUserCreated={handleUserCreated}
+                  onUserCreated={(newUser) => {
+                    setUsers((prev) => [...prev, newUser]);
+                    showToast(`Added ${newUser.name}`);
+                  }}
                 />
 
                 {/* + New Button (Guaranteed fully visible, no overflow) */}
