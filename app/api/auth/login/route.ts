@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, email } = body;
+    const userId = body.userId || body.id;
+    const email = body.email;
+    const username = (body.username || body.userName || body.name || '').trim().toLowerCase();
 
     let targetUser: User | undefined;
 
@@ -15,6 +17,13 @@ export async function POST(req: NextRequest) {
       targetUser = store.getUserById(userId);
     } else if (email) {
       targetUser = store.getAllUsers().find((u) => u.email.toLowerCase() === email.toLowerCase());
+    } else if (username) {
+      targetUser = store.getAllUsers().find(
+        (u) =>
+          u.name.toLowerCase() === username ||
+          u.email.toLowerCase().startsWith(username) ||
+          u.name.toLowerCase().includes(username)
+      );
     }
 
     if (!targetUser) {

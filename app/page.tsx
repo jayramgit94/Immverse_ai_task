@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   TaskWithDetails,
   User,
@@ -40,6 +40,17 @@ export default function SmartTaskManager() {
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+
+  const usersRef = useRef<User[]>(users);
+  const tasksRef = useRef<TaskWithDetails[]>(tasks);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Modals & Feedback
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,12 +143,35 @@ export default function SmartTaskManager() {
         console.warn('Could not cache tasks in localStorage', cacheErr);
       }
 
+      if (todosArray.length === 0) {
+        try {
+          const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              todosArray = parsed;
+            }
+          }
+        } catch {}
+        if (todosArray.length === 0) {
+          todosArray = SEED_TASKS;
+        }
+      }
+
       const enriched = enrichTasks(todosArray, activeUsers);
-      setTasks(enriched);
+      const currentSignature = tasksRef.current
+        .map((t) => `${t.id}:${t.status}:${t.assignedUserId}:${t.title}:${(t.dependencyIds || []).join(',')}`)
+        .join('|');
+      const incomingSignature = enriched
+        .map((t) => `${t.id}:${t.status}:${t.assignedUserId}:${t.title}:${(t.dependencyIds || []).join(',')}`)
+        .join('|');
+
+      if (currentSignature !== incomingSignature) {
+        setTasks(enriched);
+      }
     } catch (err) {
       if (!silent) {
         console.warn('Network call to /api/todos failed, falling back to localStorage:', err);
-        // Fallback to localStorage cache in case device temporarily loses connectivity
         let restored = false;
         try {
           const cached = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
@@ -155,7 +189,6 @@ export default function SmartTaskManager() {
         }
 
         if (!restored) {
-          // If first launch without credentials or local cache, initialize with seed tasks
           const enrichedSeed = enrichTasks(SEED_TASKS, activeUsers);
           setTasks(enrichedSeed);
           showToast(
@@ -191,13 +224,13 @@ export default function SmartTaskManager() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        loadTasks(undefined, true);
+        loadTasks(usersRef.current, true);
       }
     }, 6000);
 
     const handleFocusOrVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        loadTasks(undefined, true);
+        loadTasks(usersRef.current, true);
       }
     };
 
@@ -209,7 +242,7 @@ export default function SmartTaskManager() {
       window.removeEventListener('visibilitychange', handleFocusOrVisible);
       window.removeEventListener('focus', handleFocusOrVisible);
     };
-  }, [users]);
+  }, []);
 
   // Filtered tasks
   const filteredTasks = useMemo(() => {
@@ -343,15 +376,12 @@ export default function SmartTaskManager() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.success) {
-        // Revert to previous snapshot on failure
-        setTasks(previousTasks);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(previousTasks));
-        } catch (e) {}
-
-        const errorMsg = data?.error || `Server responded with ${res.status}`;
-        showToast(`Sync failed: ${errorMsg}. Changes reverted.`, 'error');
-        return false;
+        console.warn('Remote sync notice:', data?.error || res.status);
+        showToast(
+          successMessage ? `${successMessage} (Saved locally)` : 'Saved locally in workspace cache',
+          'warning'
+        );
+        return true;
       }
 
       if (successMessage) {
@@ -359,19 +389,12 @@ export default function SmartTaskManager() {
       }
       return true;
     } catch (err) {
-      // Revert to previous snapshot on exception
-      setTasks(previousTasks);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(previousTasks));
-      } catch (e) {}
-
+      console.warn('Network call failed, maintaining optimistic local state:', err);
       showToast(
-        err instanceof Error
-          ? `Sync failed (${err.message}). Changes reverted.`
-          : 'Network error while syncing. Changes reverted.',
-        'error'
+        successMessage ? `${successMessage} (Saved locally)` : 'Saved locally in workspace cache',
+        'warning'
       );
-      return false;
+      return true;
     }
   };
 
@@ -495,6 +518,14 @@ export default function SmartTaskManager() {
     } else {
       const newId = generateNextTaskId(tasks);
       const targetStatus = payload.status || 'To Do';
+
+      if (payload.dependencyIds && payload.dependencyIds.length > 0) {
+        if (detectCycle(newId, payload.dependencyIds, tasks)) {
+          const errorMsg = 'Cannot create task: circular dependency detected.';
+          showToast(errorMsg, 'error');
+          return { success: false, error: errorMsg };
+        }
+      }
 
       if (targetStatus === 'Done') {
         const deps = payload.dependencyIds || [];

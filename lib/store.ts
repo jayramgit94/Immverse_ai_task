@@ -453,30 +453,51 @@ class InMemoryDatabase {
   }
 
   /**
-   * Detects if setting proposedDependencies for taskId would create a cycle using Depth-First Search.
+   * 3-Color DFS Cycle Detection (White/Gray/Black).
+   * Validates if assigning proposedDependencies to taskId creates any cycle.
    */
   private detectCycle(taskId: string, proposedDependencies: string[]): boolean {
+    if (!proposedDependencies || proposedDependencies.length === 0) return false;
     if (proposedDependencies.includes(taskId)) return true;
 
-    const visited = new Set<string>();
-
-    const dfs = (currentId: string): boolean => {
-      if (currentId === taskId) return true;
-      if (visited.has(currentId)) return false;
-      visited.add(currentId);
-
-      const task = this.tasks.get(currentId);
-      if (!task) return false;
-
-      for (const depId of task.dependencyIds) {
-        if (dfs(depId)) return true;
+    const graph = new Map<string, string[]>();
+    for (const [id, t] of this.tasks.entries()) {
+      if (id === taskId) {
+        graph.set(id, proposedDependencies);
+      } else {
+        graph.set(id, t.dependencyIds || []);
       }
+    }
+    if (!graph.has(taskId)) {
+      graph.set(taskId, proposedDependencies);
+    }
+
+    const state = new Map<string, number>();
+
+    const hasCycleDfs = (node: string): boolean => {
+      const nodeState = state.get(node) || 0;
+      if (nodeState === 1) return true;
+      if (nodeState === 2) return false;
+
+      state.set(node, 1);
+
+      const neighbors = graph.get(node) || [];
+      for (const neighbor of neighbors) {
+        if (hasCycleDfs(neighbor)) return true;
+      }
+
+      state.set(node, 2);
       return false;
     };
 
-    for (const depId of proposedDependencies) {
-      if (dfs(depId)) return true;
+    if (hasCycleDfs(taskId)) return true;
+
+    for (const node of graph.keys()) {
+      if ((state.get(node) || 0) === 0) {
+        if (hasCycleDfs(node)) return true;
+      }
     }
+
     return false;
   }
 

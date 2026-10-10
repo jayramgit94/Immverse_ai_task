@@ -29,26 +29,23 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, role } = body;
+    const rawName = (body.name || body.username || body.userName || '').trim();
+    const role = (body.role || 'Team Member').trim();
+    const email = typeof body.email === 'string' && body.email.includes('@')
+      ? body.email.trim().toLowerCase()
+      : `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '.') || 'user'}@company.internal`;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
+    if (!rawName) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: 'User name is required.' },
-        { status: 400 }
-      );
-    }
-
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: 'A valid email address is required.' },
+        { success: false, error: 'User name or username is required.' },
         { status: 400 }
       );
     }
 
     const newUser = store.createUser({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      role: (role || 'Team Member').trim(),
+      name: rawName,
+      email,
+      role,
     });
 
     return NextResponse.json<ApiResponse<User>>(

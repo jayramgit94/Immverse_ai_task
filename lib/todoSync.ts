@@ -89,31 +89,56 @@ export function enrichTasks(rawTasks: any[], userList: User[]): TaskWithDetails[
 }
 
 /**
- * Detects whether setting proposedDependencies for taskId creates a cyclic dependency graph using DFS.
+ * Industry-standard 3-color (White/Gray/Black) cycle detection in a Directed Graph.
+ * Validates whether assigning proposedDependencies to taskId would create ANY circular dependency.
+ * Guarantees O(V + E) runtime and eliminates recursion loops.
  */
 export function detectCycle(taskId: string, proposedDependencies: string[], allTasks: Task[]): boolean {
+  if (!proposedDependencies || proposedDependencies.length === 0) return false;
   if (proposedDependencies.includes(taskId)) return true;
 
-  const taskMap = new Map(allTasks.map((t) => [t.id, t]));
-  const visited = new Set<string>();
-
-  const dfs = (currentId: string): boolean => {
-    if (currentId === taskId) return true;
-    if (visited.has(currentId)) return false;
-    visited.add(currentId);
-
-    const task = taskMap.get(currentId);
-    if (!task) return false;
-
-    for (const depId of task.dependencyIds || []) {
-      if (dfs(depId)) return true;
+  // Build simulated adjacency list
+  const graph = new Map<string, string[]>();
+  for (const t of allTasks) {
+    if (t.id === taskId) {
+      graph.set(t.id, proposedDependencies);
+    } else {
+      graph.set(t.id, t.dependencyIds || []);
     }
+  }
+  if (!graph.has(taskId)) {
+    graph.set(taskId, proposedDependencies);
+  }
+
+  // 0: Unvisited (White), 1: In Current Recursion Stack (Gray), 2: Verified Safe (Black)
+  const state = new Map<string, number>();
+
+  const hasCycleDfs = (node: string): boolean => {
+    const nodeState = state.get(node) || 0;
+    if (nodeState === 1) return true; // Cycle detected: back-edge to ancestor in current path!
+    if (nodeState === 2) return false; // Already verified acyclic
+
+    state.set(node, 1);
+
+    const neighbors = graph.get(node) || [];
+    for (const neighbor of neighbors) {
+      if (hasCycleDfs(neighbor)) return true;
+    }
+
+    state.set(node, 2);
     return false;
   };
 
-  for (const depId of proposedDependencies) {
-    if (dfs(depId)) return true;
+  // Check path starting from taskId
+  if (hasCycleDfs(taskId)) return true;
+
+  // Check all connected components
+  for (const node of graph.keys()) {
+    if ((state.get(node) || 0) === 0) {
+      if (hasCycleDfs(node)) return true;
+    }
   }
+
   return false;
 }
 

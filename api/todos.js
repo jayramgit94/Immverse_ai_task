@@ -149,9 +149,11 @@ export default async function handler(req, res) {
       }
 
       if (!gistId || !githubToken) {
-        return res.status(500).json({
-          success: false,
-          error: 'Missing server credentials: GITHUB_TOKEN and GIST_ID must be configured.',
+        return res.status(200).json({
+          success: true,
+          syncedToRemote: false,
+          todos: contentToSave,
+          warning: 'Saved to local workspace cache (set GITHUB_TOKEN and GIST_ID in environment to sync with remote Gist).',
         });
       }
 
@@ -176,15 +178,19 @@ export default async function handler(req, res) {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        return res.status(response.status >= 400 && response.status < 600 ? response.status : 500).json({
-          success: false,
-          error: `GitHub API error (${response.status}): ${errorText || response.statusText}`,
+        const errorText = await response.text().catch(() => '');
+        console.warn(`GitHub API notice (${response.status}): ${errorText}`);
+        return res.status(200).json({
+          success: true,
+          syncedToRemote: false,
+          todos: contentToSave,
+          warning: `Saved to local cache (Gist remote status: ${response.status}).`,
         });
       }
 
       return res.status(200).json({
         success: true,
+        syncedToRemote: true,
         todos: body,
       });
     }

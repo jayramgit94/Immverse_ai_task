@@ -57,10 +57,13 @@ export function UserSwitcher({
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim()) {
-      setError('Name and email are required');
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      setError('Username or full name is required');
       return;
     }
+
+    const effectiveEmail = newEmail.trim() || `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@company.internal`;
 
     setIsSubmitting(true);
     setError(null);
@@ -72,8 +75,9 @@ export function UserSwitcher({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: newName.trim(),
-            email: newEmail.trim(),
+            name: trimmedName,
+            username: trimmedName,
+            email: effectiveEmail,
             role: newRole.trim() || 'Software Engineer',
           }),
         });
@@ -269,11 +273,11 @@ export function UserSwitcher({
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                    Full name <span className="text-rose-500">*</span>
+                    Username or Full Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Liam Smith"
+                    placeholder="e.g. Liam Smith or liam"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     className="w-full px-3 py-2 text-sm bg-white border border-[#E5E7EB] rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-xs"
@@ -282,7 +286,7 @@ export function UserSwitcher({
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                    Email address <span className="text-rose-500">*</span>
+                    Email address <span className="text-gray-400 font-normal">(optional)</span>
                   </label>
                   <input
                     type="email"

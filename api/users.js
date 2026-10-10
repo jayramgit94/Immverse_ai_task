@@ -67,18 +67,17 @@ export default async function handler(req, res) {
       }
     }
 
-    const { name, email, role } = body || {};
+    const rawName = (body?.name || body?.username || body?.userName || '').trim();
+    const role = (body?.role || 'Team Member').trim();
+    const email = typeof body?.email === 'string' && body?.email.includes('@')
+      ? body.email.trim().toLowerCase()
+      : `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '.') || 'user'}@company.internal`;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ success: false, error: 'User name is required.' });
+    if (!rawName) {
+      return res.status(400).json({ success: false, error: 'User name or username is required.' });
     }
 
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return res.status(400).json({ success: false, error: 'A valid email address is required.' });
-    }
-
-    const initials = name
-      .trim()
+    const initials = rawName
       .split(' ')
       .filter(Boolean)
       .map((p) => p[0])
@@ -88,9 +87,9 @@ export default async function handler(req, res) {
 
     const newUser = {
       id: `USR-${Date.now().toString(36).toUpperCase()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      role: (role || 'Team Member').trim(),
+      name: rawName,
+      email,
+      role,
       initials,
       avatarColor: '#2563EB',
     };
